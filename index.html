@@ -1,21 +1,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Stepped Color Scale Temp Map on Leaflet (USA Grid)</title>
+  <title>SWRCC Hourly Temp Grid Map</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <style>
-    /* Reset and base */
     body, html {
-      margin: 0; padding: 0; height: 100%;
+      margin: 0;
+      padding: 0;
+      height: 100%;
       font-family: Arial, sans-serif;
       display: flex;
       flex-direction: column;
     }
 
-    /* Top navigation bar */
     header {
       background-color: #6a0dad;
       color: white;
@@ -24,60 +24,61 @@
       font-weight: bold;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
       flex-shrink: 0;
-      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
-    /* Map container takes remaining height minus legend and nav */
-    #map {
-      flex-grow: 1;
-      min-height: 400px; /* fallback */
-      position: relative;
+    .nav-buttons {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
-    /* Legend container */
+    .nav-button {
+      background-color: white;
+      color: #6a0dad;
+      border: none;
+      padding: 6px 12px;
+      font-weight: bold;
+      font-size: 14px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .nav-button:hover {
+      background-color: #eee;
+    }
+
+    #zoomLevelDisplay {
+      font-size: 14px;
+      font-weight: normal;
+    }
+
+    #map { flex-grow: 1; }
+
     .legend {
       width: 95%;
       max-width: 800px;
       margin: 12px auto 24px auto;
       font-size: 12px;
       color: #333;
-      user-select: none;
       display: flex;
       flex-direction: column;
       align-items: center;
     }
-    
-    /* Gradient bar */
+
     .legend-gradient {
       width: 100%;
       height: 25px;
       border: 1px solid #888;
       border-radius: 4px;
       background: linear-gradient(to right,
-        #6a0dad 0%,
-        #4b0082 5%,
-        #00008b 10%,
-        #add8e6 15%,
-        #b0f0ff 20%,
-        #d4f0ff 25%,
-        #7dc47d 30%,
-        #008000 35%,
-        #70d070 40%,
-        #90ee90 45%,
-        #cfcf9a 50%,
-        #ffffe0 55%,
-        #ffd580 60%,
-        #ffb547 65%,
-        #ff8c00 70%,
-        #ff6a00 75%,
-        #ff0000 80%,
-        #cc0000 85%,
-        #8b0000 90%,
-        #ff69b4 95%,
-        #ff69b4 100%);
+        #6a0dad, #4b0082, #00008b, #add8e6, #b0f0ff, #d4f0ff, #7dc47d,
+        #008000, #70d070, #90ee90, #cfcf9a, #ffffe0, #ffd580, #ffb547,
+        #ff8c00, #ff6a00, #ff0000, #cc0000, #8b0000, #ff69b4);
     }
-    
-    /* Label container below the gradient */
+
     .legend-labels {
       width: 100%;
       display: flex;
@@ -86,12 +87,7 @@
       padding: 0 2px;
       font-weight: bold;
     }
-    
-    .legend-labels span {
-      user-select: none;
-    }
 
-    /* Tooltip style overrides: just text, no box or background */
     .leaflet-tooltip.my-label {
       background: transparent !important;
       border: none !important;
@@ -104,7 +100,6 @@
       padding: 0 !important;
     }
 
-    /* Custom toggle button style */
     .toggle-labels-control {
       background: white;
       padding: 6px 10px;
@@ -113,45 +108,64 @@
       cursor: pointer;
       font-size: 14px;
       font-weight: bold;
-      user-select: none;
     }
-    .toggle-labels-control:hover {
-      background: #6a0dad;
-      color: white;
+
+    #slider-container {
+      padding: 10px 20px;
+      text-align: center;
+    }
+
+    #hourSlider {
+      width: 100%;
+      max-width: 600px;
+    }
+
+    #hourLabel {
+      font-weight: bold;
+      margin-left: 10px;
+    }
+
+    #timeLabel {
+      margin-left: 15px;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-
   <header>
-    SWRCC Temperature Map
+    <div class="nav-buttons">
+      <span>SWRCC Hourly Temperature Map</span>
+      <button class="nav-button" onclick="window.location.href='precipgrid.html'">Conditions</button>
+    </div>
+    <span id="zoomLevelDisplay">Zoom: 4</span>
   </header>
+
+  <div id="slider-container">
+    Hour Ahead:
+    <input type="range" id="hourSlider" min="0" max="23" value="0" />
+    <span id="hourLabel">Now</span>
+    <span id="timeLabel"></span>
+  </div>
 
   <div id="map"></div>
 
-  <div class="legend" aria-label="Temperature color scale">
+  <div class="legend">
     <div class="legend-gradient"></div>
     <div class="legend-labels">
-      <span>0°F</span>
-      <span>20°F</span>
-      <span>40°F</span>
-      <span>60°F</span>
-      <span>80°F</span>
-      <span>100°F</span>
-      <span>120°F</span>
+      <span>0°F</span><span>20°F</span><span>40°F</span><span>60°F</span><span>80°F</span><span>100°F</span><span>120°F</span>
     </div>
   </div>
 
   <script>
-    // Center on continental US
-    const map = L.map('map').setView([39.5, -98.35], 4);
+    const LABEL_ZOOM_THRESHOLD = 7;
+    const zoomDisplay = document.getElementById("zoomLevelDisplay");
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
-    }).addTo(map);
+    const map = L.map('map', { keyboard: false }).setView([39.5, -98.35], 4);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // Locations for fetching temps
     const locations = [
+    
+  {name: "Raquette Lake, NY", "lat": 43.8145, "lon": -74.6399},
   { name: 'Albany, NY', lat: 42.6526, lon: -73.7562 },
   { name: 'Buffalo, NY', lat: 42.8864, lon: -78.8784 },
   { name: 'New York City, NY', lat: 40.7128, lon: -74.0060 },
@@ -684,231 +698,339 @@
   { name: 'Marquette, MI', lat: 46.5476, lon: -87.3954 },
   { name: 'Bellingham, WA', lat: 48.7541, lon: -122.4787 },
   { name: 'Thunder Bay, ON, Canada', lat: 48.3809, lon: -89.2477 },
-  { name: "Manitouwadge, ON, Canada", "lat": 48.8181, "lon": -86.7160},
-  { name: 'Yakima, WA', lat: 46.6021, lon: -120.5059 },
-  { name: 'Santa Rosa, CA', lat: 38.4405, lon: -122.7144 },      // Sonoma County
-  { name: 'Livermore, CA', lat: 37.6819, lon: -121.7680 },
-  { name: 'Carson City, NV', lat: 39.1638, lon: -119.7674 },      // Nevada capital
-  { name: 'Placerville, CA', lat: 38.7296, lon: -120.7983 },      // California foothills
-  { name: 'Florence, OR', lat: 43.9827, lon: -124.1058 },         // Oregon coast
-  { name: 'Albany, OR', lat: 44.6368, lon: -123.1059 },           // Willamette Valley
-  { name: 'Ashford, WA', lat: 46.7265, lon: -121.7807 },          // Near Mt. Rainier
-  { name: 'Eugene, OR', lat: 44.0521, lon: -123.0868 },           // Oregon
-  { name: 'Reno, NV', lat: 39.5296, lon: -119.8138 },             // Nevada
-  { name: 'Salem, OR', lat: 44.9429, lon: -123.0351 },            // Oregon capital
-  { name: 'Olympia, WA', lat: 47.0379, lon: -122.9007 },          // Washington capital
-  { name: 'Medford, OR', lat: 42.3265, lon: -122.8756 },
-  { name: 'Ashland, ME', lat: 46.6298, lon: -68.4036 },            // Northern Maine
-  { name: 'Mars Hill, ME', lat: 46.5137, lon: -67.8666 },          // Northeast Maine
-  { name: 'Millinocket, ME', lat: 45.6578, lon: -68.7092 },
-  { name: 'Brick Township, NJ', lat: 40.0593, lon: -74.1377 },
-  { name: 'Howell Township, NJ', lat: 40.1641, lon: -74.2010 },
-  { name: 'Seaside Heights, NJ', lat: 39.9443, lon: -74.0726 },
-  { name: 'Long Branch, NJ', lat: 40.3043, lon: -73.9924 },
-  { name: 'Monroe Township, NJ', lat: 40.3357, lon: -74.4337 },
-  { name: 'Ely, MN', lat: 47.9030, lon: -91.8675 },              // Gateway to Boundary Waters
-  { name: 'Ashland, ME', lat: 46.6298, lon: -68.4036 },          // Remote northern Maine
-  { name: 'Lanesboro, MN', lat: 43.7180, lon: -91.9732 },        // Bluff country bike trails
-  { name: 'Wallace, ID', lat: 47.4735, lon: -115.9245 },         // Historic mining town
-  { name: 'Abingdon, VA', lat: 36.7098, lon: -81.9773 },         // Appalachian charm
-  { name: 'Brevard, NC', lat: 35.2334, lon: -82.7343 },          // Waterfalls & music
-  { name: 'Bisbee, AZ', lat: 31.4482, lon: -109.9284 },          // Artsy desert town
-  { name: 'Whitefish, MT', lat: 48.4117, lon: -114.3376 },       // Gateway to Glacier NP
-  { name: 'Camden, ME', lat: 44.2093, lon: -69.0620 },           // Coastal sailing village
-  { name: 'Yellow Springs, OH', lat: 39.8064, lon: -83.8866 },   // Quirky and creative
-  { name: 'Florence, OR', lat: 43.9827, lon: -124.1058 },        // Coastal dunes
-  { name: 'Galena, IL', lat: 42.4167, lon: -90.4290 },           // Historic river town
-  { name: 'Marfa, TX', lat: 30.3094, lon: -104.0206 },           // Minimalist art and desert
-  { name: 'Floyd, VA', lat: 36.9118, lon: -80.3201 },            // Bluegrass and mountains
-  { name: 'Sisters, OR', lat: 44.2907, lon: -121.5492 },         // Mountain town with charm
-  { name: 'Jerome, AZ', lat: 34.7489, lon: -112.1135 },          // Ghost town turned artist colony
-  { name: 'New Harmony, IN', lat: 38.1292, lon: -87.9356 },      // Historic utopian town
-  { name: 'Bayfield, WI', lat: 46.8108, lon: -90.8188 },         // Lake Superior and Apostle Islands
-  { name: 'Harpers Ferry, WV', lat: 39.3254, lon: -77.7389 },    // Civil War history & hiking
-  { name: 'Blowing Rock, NC', lat: 36.1321, lon: -81.6771 },
-  { name: 'Dahlonega, GA', lat: 34.5329, lon: -83.9840 },        // Gold rush roots in the mountains
-  { name: 'Salida, CO', lat: 38.5347, lon: -105.9989 },          // River and arts community
-  { name: 'Port Townsend, WA', lat: 48.1170, lon: -122.7604 },   // Victorian seaport
-  { name: 'Skagway, AK', lat: 59.4584, lon: -135.3131 },         // Gold Rush era preserved
-  { name: 'Beaufort, SC', lat: 32.4316, lon: -80.6698 },         // Southern coastal charm
-  { name: 'Nevada City, CA', lat: 39.2610, lon: -121.0161 },     // Gold rush architecture
-  { name: 'Berlin, MD', lat: 38.3226, lon: -75.2177 },           // Named "Coolest Small Town"
-  { name: 'Oxford, MS', lat: 34.3665, lon: -89.5192 },           // Faulkner's hometown
-  { name: 'Midway, KY', lat: 38.1506, lon: -84.6830 },           // Quaint downtown in horse country
-  { name: 'Guthrie, OK', lat: 35.8784, lon: -97.4253 },          // Old West with restored buildings
-  { name: 'Carmel-by-the-Sea, CA', lat: 36.5552, lon: -121.9233 },// Artsy Pacific coast village
-  { name: 'St. Francisville, LA', lat: 30.7885, lon: -91.3801 }, // Oak trees and old plantations
-  { name: 'Cambria, CA', lat: 35.5642, lon: -121.0802 },         // Coastal cliffside town
-  { name: 'Talkeetna, AK', lat: 62.3209, lon: -150.1066 },       // Mount Denali views & base
-  { name: 'Afton, WY', lat: 42.7280, lon: -110.9333 },           // Scenic Star Valley
-  { name: 'Winthrop, WA', lat: 48.4771, lon: -120.1859 },        // Western-style town
-  { name: 'Guthrie Center, IA', lat: 41.6877, lon: -94.4990 },   // Midwest farming hub
-  { name: 'Prairie du Chien, WI', lat: 43.0503, lon: -91.1404 }, // Mississippi River town
-  { name: 'Hannibal, MO', lat: 39.7084, lon: -91.3585 },         // Mark Twain’s hometown
-  { name: 'Saranac Lake, NY', lat: 44.3295, lon: -74.1313 },
-  { name: 'Scottsbluff, NE', lat: 41.8666, lon: -103.6672 },
-  { name: 'Cheyenne, WY', lat: 41.1400, lon: -104.8202 },
-  { name: 'Wheatland, WY', lat: 42.0547, lon: -104.9594 },
-
-
-
+  {name: "Manitouwadge, ON, Canada", "lat": 48.8181, "lon": -86.7160},
+  { name: 'Dubuque, IA', lat: 42.5006, lon: -90.6646 },           // Northeast Iowa
+{ name: 'Sioux City, IA', lat: 42.4990, lon: -96.4003 },        // Northwest Iowa
+{ name: 'Council Bluffs, IA', lat: 41.2619, lon: -95.8608 },    // Southwest Iowa
+{ name: 'Burlington, IA', lat: 40.8075, lon: -91.1129 },        // Southeast Iowa
+{ name: 'Mason City, IA', lat: 43.1536, lon: -93.2010 },        // North-central Iowa
+{ name: 'Ottumwa, IA', lat: 41.0129, lon: -92.4143 },           // South-central Iowa
+{ name: 'Fort Dodge, IA', lat: 42.4975, lon: -94.1680 },        // Northwest-central Iowa
+{ name: 'Ames, IA', lat: 42.0308, lon: -93.6319 },              // Central Iowa
+{ name: 'Cedar Rapids, IA', lat: 41.9779, lon: -91.6656 },      // East-central Iowa
+{ name: 'Des Moines, IA', lat: 41.5868, lon: -93.6250 }, 
+{ name: 'Minneapolis, MN', lat: 44.9778, lon: -93.2650 },       // Southeast-central (Twin Cities)
+{ name: 'St. Paul, MN', lat: 44.9537, lon: -93.0900 },          // Twin Cities, state capital
+{ name: 'Duluth, MN', lat: 46.7867, lon: -92.1005 },            // Northeast, Lake Superior
+{ name: 'Rochester, MN', lat: 44.0121, lon: -92.4802 },         // Southeast
+{ name: 'Mankato, MN', lat: 44.1636, lon: -93.9994 },           // South-central
+{ name: 'St. Cloud, MN', lat: 45.5602, lon: -94.1620 },         // Central Minnesota
+{ name: 'Bemidji, MN', lat: 47.4736, lon: -94.8803 },           // North-central
+{ name: 'International Falls, MN', lat: 48.6017, lon: -93.4103 },// Far north, near Canada
+{ name: 'Moorhead, MN', lat: 46.8739, lon: -96.7695 },          // Northwest, near Fargo, ND
+{ name: 'Marshall, MN', lat: 44.4469, lon: -95.7883 },           // Southwest
+{ name: 'Jackson, MS', lat: 32.2988, lon: -90.1848 },           // Central Mississippi (capital)
+{ name: 'Biloxi, MS', lat: 30.3960, lon: -88.8853 },            // Southeast Gulf Coast
+{ name: 'Hattiesburg, MS', lat: 31.3271, lon: -89.2903 },       // Southeast inland
+{ name: 'Gulfport, MS', lat: 30.3674, lon: -89.0928 },          // South Gulf Coast
+{ name: 'Tupelo, MS', lat: 34.2576, lon: -88.7034 },            // Northeast Mississippi
+{ name: 'Meridian, MS', lat: 32.3643, lon: -88.7037 },          // East-central Mississippi
+{ name: 'Greenville, MS', lat: 33.4088, lon: -91.0618 },        // Northwest Mississippi (Delta)
+{ name: 'Columbus, MS', lat: 33.4957, lon: -88.4273 },          // East Mississippi
+{ name: 'McComb, MS', lat: 31.2438, lon: -90.4532 },            // Southwest Mississippi
+{ name: 'Oxford, MS', lat: 34.3665, lon: -89.5192 },             // North-central Mississippi
+{ name: 'Alpine, TX', lat: 30.3609, lon: -103.6610 },           // West Texas, Big Bend region
+{ name: 'Marfa, TX', lat: 30.3090, lon: -104.0206 },            // West Texas, artsy desert town
+{ name: 'Llano, TX', lat: 30.7594, lon: -98.6745 },             // Central Hill Country
+{ name: 'Jasper, TX', lat: 30.9202, lon: -94.0030 },            // East Texas Piney Woods
+{ name: 'Pampa, TX', lat: 35.5361, lon: -100.9599 },            // Northern Panhandle
+{ name: 'Pearsall, TX', lat: 28.8925, lon: -99.0948 },          // South Texas
+{ name: 'Palestine, TX', lat: 31.7621, lon: -95.6308 },         // East-central Texas
+{ name: 'Van Horn, TX', lat: 31.0416, lon: -104.8316 },         // Far West Texas along I-10
+{ name: 'Cuero, TX', lat: 29.0939, lon: -97.2897 },             // Southeast Central Texas
+{ name: 'Childress, TX', lat: 34.4262, lon: -100.2040 },         // Northwest Texas
+{ name: 'Midland, TX', lat: 31.9973, lon: -102.0779 },          // West Texas oil region
+{ name: 'San Angelo, TX', lat: 31.4638, lon: -100.4370 },       // West-central Texas
+{ name: 'Sonora, TX', lat: 30.5663, lon: -100.6437 },           // Southwest of San Angelo
+{ name: 'Abilene, TX', lat: 32.4487, lon: -99.7331 },            // North-central Texas
+{ name: 'Wichita Falls, TX', lat: 33.9137, lon: -98.4934 },       // North Texas near OK border
+{ name: 'Elko, NV', lat: 40.8324, lon: -115.7631 },             // Northeast Nevada
+{ name: 'Ely, NV', lat: 39.2471, lon: -114.8880 },              // East-central Nevada
+{ name: 'Tonopah, NV', lat: 38.0667, lon: -117.2319 },          // Central Nevada
+{ name: 'Winnemucca, NV', lat: 40.9729, lon: -117.7357 },       // Northwest-central
+{ name: 'Battle Mountain, NV', lat: 40.6427, lon: -116.9334 },  // North-central
+{ name: 'Hawthorne, NV', lat: 38.5249, lon: -118.6226 },        // West-central Nevada
+{ name: 'Caliente, NV', lat: 37.6144, lon: -114.5131 },         // Southeast Nevada
+{ name: 'Pioche, NV', lat: 37.9305, lon: -114.4528 },           // East of Caliente
+{ name: 'Pahrump, NV', lat: 36.2083, lon: -116.0258 },          // South near CA border
+{ name: 'Lovelock, NV', lat: 40.1794, lon: -118.4737 },
+{ name: 'Alturas, CA', lat: 41.4870, lon: -120.5425 },           // Remote far northeast
+{ name: 'Susanville, CA', lat: 40.4163, lon: -120.6530 },        // Northeast mountains
+{ name: 'Loyalton, CA', lat: 39.6768, lon: -120.2416 },          // Sierra Valley
+{ name: 'Bridgeport, CA', lat: 38.2555, lon: -119.2313 },        // Eastern Sierra
+{ name: 'Lone Pine, CA', lat: 36.6060, lon: -118.0626 },         // Owens Valley
+{ name: 'Trona, CA', lat: 35.7638, lon: -117.3731 },             // Mojave Desert
+{ name: 'Bishop, CA', lat: 37.3635, lon: -118.3951 },            // Eastern Sierra
+{ name: 'Needles, CA', lat: 34.8481, lon: -114.6141 },           // Southeast corner near AZ
+{ name: 'Blythe, CA', lat: 33.6103, lon: -114.5962 },            // Lower Colorado River
+{ name: 'Weaverville, CA', lat: 40.7307, lon: -122.9364 },       // Remote northwest mountains
+{ name: 'Fort Bragg, CA', lat: 39.4455, lon: -123.8053 },        // Remote North Coast
+{ name: 'Willits, CA', lat: 39.4096, lon: -123.3556 },           // Inland Mendocino County
+{ name: 'Quincy, CA', lat: 39.9368, lon: -120.9472 },            // Sierra Nevada
+{ name: 'Mariposa, CA', lat: 37.4849, lon: -119.9661 },          // Foothills, near Yosemite
+{ name: 'Taft, CA', lat: 35.1420, lon: -119.4565 },              // Western Kern County
+{ name: 'Trinidad, CA', lat: 41.0590, lon: -124.1433 },          // Remote North Coast
+{ name: 'Crescent City, CA', lat: 41.7558, lon: -124.2014 },     // Far north coast near Oregon
+{ name: 'Shoshone, CA', lat: 35.9741, lon: -116.2711 },          // Near Death Valley
+{ name: 'Big Pine, CA', lat: 37.1644, lon: -118.2895 },          // Eastern Sierra below Bishop
+{ name: 'King City, CA', lat: 36.2122, lon: -121.1249 },
+{ name: 'Brookings, OR', lat: 42.0526, lon: -124.2836 },        // Far southwest coast
+{ name: 'Bandon, OR', lat: 43.1193, lon: -124.4083 },           // South-central coast
+{ name: 'John Day, OR', lat: 44.4154, lon: -118.9522 },         // Eastern mountains
+{ name: 'Burns, OR', lat: 43.5860, lon: -119.0547 },            // High desert, east-central
+{ name: 'Lakeview, OR', lat: 42.1888, lon: -120.3442 },         // Far south near California
+{ name: 'Fossil, OR', lat: 44.9998, lon: -120.2120 },           // Central-north interior
+{ name: 'Toledo, OR', lat: 44.6212, lon: -123.9381 },
+{ name: 'Page, AZ', lat: 36.9147, lon: -111.4558 },             // Far north, near Lake Powell
+{ name: 'Fredonia, AZ', lat: 36.9492, lon: -112.5263 },         // Northwest near Utah
+{ name: 'Seligman, AZ', lat: 35.3283, lon: -112.8746 },         // Route 66, western AZ
+{ name: 'Eagar, AZ', lat: 34.1117, lon: -109.2926 },            // White Mountains, eastern AZ
+{ name: 'Willcox, AZ', lat: 32.2529, lon: -109.8326 },          // Southeast desert region
+{ name: 'Bouse, AZ', lat: 33.9320, lon: -114.0077 },            // West desert, near Colorado River
+{ name: 'Ajo, AZ', lat: 32.3712, lon: -112.8596 },              // Southwest near Organ Pipe Cactus NM
+{ name: 'Dateland, AZ', lat: 32.8006, lon: -113.5388 },         // Central desert between Yuma and Phoenix
+{ name: 'Snowflake, AZ', lat: 34.5139, lon: -110.0787 },        // East-central AZ, Mogollon Rim
+{ name: 'Arivaca, AZ', lat: 31.5757, lon: -111.3273 },
+{ name: 'Chadron, NE', lat: 42.8297, lon: -102.9993 },         // Far northwest Panhandle
+{ name: 'Valentine, NE', lat: 42.8725, lon: -100.5501 },       // North-central, Sandhills
+{ name: 'Alliance, NE', lat: 42.1011, lon: -102.8707 },        // Western Nebraska
+{ name: 'Broken Bow, NE', lat: 41.4033, lon: -99.6404 },       // Central Nebraska
+{ name: 'McCook, NE', lat: 40.2011, lon: -100.6237 },          // Southwest Nebraska
+{ name: 'O’Neill, NE', lat: 42.4603, lon: -98.6470 },          // North-central plains
+{ name: 'Hebron, NE', lat: 40.1642, lon: -97.5887 },           // Southeast, near Kansas border
+{ name: 'Gordon, NE', lat: 42.8092, lon: -102.2028 },          // Northwest Sandhills
+{ name: 'Tecumseh, NE', lat: 40.3694, lon: -96.1936 },         // Southeast, rural edge
+{ name: 'Alma, NE', lat: 40.1017, lon: -99.3643 },
+{ name: 'Goodland, KS', lat: 39.3506, lon: -101.7106 },         // Far northwest Kansas
+{ name: 'Phillipsburg, KS', lat: 39.7558, lon: -99.3226 },      // North-central
+{ name: 'Colby, KS', lat: 39.3956, lon: -101.0527 },            // Northwest plains
+{ name: 'Norton, KS', lat: 39.8336, lon: -99.8882 },            // North-central
+{ name: 'Meade, KS', lat: 37.2859, lon: -100.3404 },            // Southwest
+{ name: 'Yates Center, KS', lat: 37.8817, lon: -95.7328 },      // Southeast
+{ name: 'Smith Center, KS', lat: 39.7786, lon: -98.7859 },      // Central-north
+{ name: 'Hill City, KS', lat: 39.3661, lon: -99.8462 },         // Western-central
+{ name: 'Howard, KS', lat: 37.4692, lon: -96.2572 },            // Southeast Flint Hills
+{ name: 'Lakin, KS', lat: 37.9406, lon: -101.2546 },
+{ name: 'Forks, WA', lat: 47.9501, lon: -124.3852 },            // Remote west Olympic Peninsula
+{ name: 'Raymond, WA', lat: 46.6862, lon: -123.7321 },          // Southwest coastal forest
+{ name: 'Omak, WA', lat: 48.4104, lon: -119.5271 },             // North-central
+{ name: 'Colville, WA', lat: 48.5446, lon: -117.9014 },         // Far northeast, near Canada
+{ name: 'Dayton, WA', lat: 46.3207, lon: -117.9724 },           // Southeast Palouse
+{ name: 'Goldendale, WA', lat: 45.8207, lon: -120.8216 },       // South-central, near Columbia River Gorge
+{ name: 'Republic, WA', lat: 48.6494, lon: -118.7363 },         // Far north
+{ name: 'Pomeroy, WA', lat: 46.4743, lon: -117.5974 },          // Southeast
+{ name: 'Tonasket, WA', lat: 48.7051, lon: -119.4387 },         // North-central Okanogan region
+{ name: 'Wilbur, WA', lat: 47.7566, lon: -118.7097 },
+{ name: 'Libby, MT', lat: 48.3883, lon: -115.5560 },           // Northwest, near Idaho border
+{ name: 'Eureka, MT', lat: 48.8789, lon: -115.0534 },          // Far northwest, near Canada
+{ name: 'Plentywood, MT', lat: 48.7758, lon: -104.5583 },      // Far northeast, near ND/Canada
+{ name: 'Malta, MT', lat: 48.3628, lon: -107.8731 },           // North-central plains
+{ name: 'Roundup, MT', lat: 46.4472, lon: -108.5422 },         // Central Montana
+{ name: 'Choteau, MT', lat: 47.8158, lon: -112.1839 },         // North of Great Falls, Rocky Mountain Front
+{ name: 'Big Timber, MT', lat: 45.8335, lon: -109.9515 },      // South-central
+{ name: 'Ekalaka, MT', lat: 45.8893, lon: -104.5512 },         // Far southeast
+{ name: 'Dillon, MT', lat: 45.2166, lon: -112.6340 },          // Southwest Montana
+{ name: 'Browning, MT', lat: 48.5552, lon: -113.0141 },         // Northern Rockies, Blackfeet Reservation
+{ name: 'Bonners Ferry, ID', lat: 48.6910, lon: -116.3166 },     // Far north near Canada
+{ name: 'Priest River, ID', lat: 48.1838, lon: -116.9116 },      // Northern panhandle
+{ name: 'Grangeville, ID', lat: 45.9263, lon: -116.1232 },       // North-central Idaho
+{ name: 'Salmon, ID', lat: 45.1750, lon: -113.8950 },            // Central mountain town
+{ name: 'Challis, ID', lat: 44.5041, lon: -114.2322 },           // Central Idaho
+{ name: 'Montpelier, ID', lat: 42.3227, lon: -111.2974 },        // Southeast, near Wyoming/Utah
+{ name: 'Rupert, ID', lat: 42.6196, lon: -113.6772 },            // South-central
+{ name: 'Council, ID', lat: 44.7291, lon: -116.4384 },           // West-central mountains
+{ name: 'Kellogg, ID', lat: 47.5383, lon: -116.1227 },           // Silver Valley, north Idaho
+{ name: 'Weiser, ID', lat: 44.2493, lon: -116.9693 },
+{ name: 'Tupper Lake, NY', lat: 44.2259, lon: -74.4646 },       // Central Adirondacks
+{ name: 'Long Lake, NY', lat: 43.9703, lon: -74.4193 },         // Heart of the Adirondacks
+{ name: 'Speculator, NY', lat: 43.5026, lon: -74.3594 },        // Southwest Adirondacks
+{ name: 'Newcomb, NY', lat: 43.9723, lon: -74.1684 },           // Central wilderness area
+{ name: 'Willsboro, NY', lat: 44.3662, lon: -73.3865 },         // Northeast edge, near Lake Champlain
+{ name: 'Margaretville, NY', lat: 42.1487, lon: -74.6482 },     // Western Catskills
+{ name: 'Phoenicia, NY', lat: 42.0845, lon: -74.3153 },         // Central Catskills
+{ name: 'Hunter, NY', lat: 42.2106, lon: -74.2110 },            // Northern Catskills, ski area
+{ name: 'Roscoe, NY', lat: 41.9331, lon: -74.9138 },            // Southern Catskills, trout country
+{ name: 'Livingston Manor, NY', lat: 41.9007, lon: -74.8287 },
+{ name: 'Potsdam, NY', lat: 44.6698, lon: -74.9813 },
+{ name: 'Southampton, NY', lat: 40.8843, lon: -72.3895 },       // South Fork, eastern Long Island
+{ name: 'Brentwood, NY', lat: 40.7812, lon: -73.2462 },         // Central Suffolk County
+{ name: 'Rocky Point, NY', lat: 40.9526, lon: -72.9295 },       // Northern Suffolk County
+{ name: 'Oyster Bay, NY', lat: 40.8676, lon: -73.5321 },        // North Shore, Nassau County
+{ name: 'New York, NY', lat: 40.7128, lon: -74.0060 },           // Manhattan / NYC proper
+{ name: 'Greenport, NY', lat: 41.1032, lon: -72.3620 },         // North Fork, eastern Suffolk
+{ name: 'Montauk, NY', lat: 41.0359, lon: -71.9545 },           // Easternmost tip of Long Island
+{ name: 'Coram, NY', lat: 40.8684, lon: -73.0015 },             // Central Suffolk County
+{ name: 'East Northport, NY', lat: 40.8762, lon: -73.3248 },     // North shore, western Suffolk
+{ name: 'Fort Kent, ME', lat: 47.2584, lon: -68.5770 },          // Far northern Maine
+{ name: 'Madawaska, ME', lat: 47.3581, lon: -68.3214 },          // Northeast tip, near Canada
+{ name: 'Houlton, ME', lat: 46.1259, lon: -67.8407 },            // Southeast Aroostook County
+{ name: 'Caribou, ME', lat: 46.8637, lon: -68.0133 },            // Northeast Maine
+{ name: 'Danforth, ME', lat: 45.6626, lon: -67.8675 },           // East near New Brunswick border
+{ name: 'Eastport, ME', lat: 44.9061, lon: -66.9891 },           // Easternmost city in the U.S.
+{ name: 'Machias, ME', lat: 44.7153, lon: -67.4616 },            // Downeast coastal town
+{ name: 'Milbridge, ME', lat: 44.5351, lon: -67.8822 },          // Downeast coast
+{ name: 'Rangeley, ME', lat: 44.9645, lon: -70.6445 },           // Western mountains
+{ name: 'Rumford, ME', lat: 44.5545, lon: -70.5487 },            // Western foothills
+{ name: 'Bethel, ME', lat: 44.4048, lon: -70.7895 },             // Western edge, near NH
+{ name: 'Skowhegan, ME', lat: 44.7656, lon: -69.7192 },          // Central Maine
+{ name: 'Greenville, ME', lat: 45.4595, lon: -69.5903 },         // Moosehead Lake region
+{ name: 'Jackman, ME', lat: 45.6267, lon: -70.2536 },            // Northwestern border
+{ name: 'Kingfield, ME', lat: 44.9592, lon: -70.1515 },          // Near Sugarloaf Mountain
+{ name: 'Bucksport, ME', lat: 44.5715, lon: -68.7943 },          // Penobscot River coast
+{ name: 'Wiscasset, ME', lat: 44.0020, lon: -69.6658 },          // Midcoast Maine
+{ name: 'Boothbay, ME', lat: 43.8596, lon: -69.6264 },           // Coastal town
+{ name: 'Alfred, ME', lat: 43.4780, lon: -70.7162 },             // Southern interior
+{ name: 'Lovell, ME', lat: 44.1840, lon: -70.8884 }              // Western foothills near NH border
 
 ];
 
-    const bounds = [0, 10, 20, 30, 32, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130];
-    const colors = [
-      '#6a0dad', '#4b0082', '#00008b', '#add8e6', '#b0f0ff', '#d4f0ff', '#7dc47d',
-      '#008000', '#70d070', '#90ee90', '#cfcf9a', '#ffffe0', '#ffd580', '#ffb547',
-      '#ff8c00', '#ff6a00', '#ff0000', '#cc0000', '#8b0000', '#ff69b4', '#ff4d94',
-      '#ff1493', '#ff007f', '#ff69b4'
-    ];
+    const bounds = [0,10,20,30,32,35,40,45,50,55,60,65,70,75,80,85,90,95,100,105,110,115,120];
+    const colors = ['#6a0dad','#4b0082','#00008b','#add8e6','#b0f0ff','#d4f0ff','#7dc47d','#008000','#70d070','#90ee90','#cfcf9a','#ffffe0','#ffd580','#ffb547','#ff8c00','#ff6a00','#ff0000','#cc0000','#8b0000','#ff69b4','#ff4d94','#ff1493'];
+
+    const slider = document.getElementById("hourSlider");
+    const hourLabel = document.getElementById("hourLabel");
+    const timeLabel = document.getElementById("timeLabel");
+
+    let currentHour = 0;
+    let gridLayerGroup = L.layerGroup().addTo(map);
+    let labelLayerGroup = L.layerGroup().addTo(map);
+    let labelsVisible = true;
+    let forecastData = {};
+
+    function formatHourOnly(hourOffset) {
+      const now = new Date();
+      now.setHours(now.getHours() + hourOffset);
+      return now.toLocaleTimeString([], { hour: 'numeric', hour12: true });
+    }
+
+    slider.addEventListener("input", () => {
+      currentHour = parseInt(slider.value);
+      hourLabel.textContent = currentHour === 0 ? "Now" : `${currentHour}h`;
+      timeLabel.textContent = formatHourOnly(currentHour);
+      drawGridThrottled();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") {
+        slider.value = Math.min(23, parseInt(slider.value) + 1);
+        slider.dispatchEvent(new Event('input'));
+      }
+      if (e.key === "ArrowLeft") {
+        slider.value = Math.max(0, parseInt(slider.value) - 1);
+        slider.dispatchEvent(new Event('input'));
+      }
+    });
 
     function tempToColor(tempF) {
-      if (tempF === '--' || tempF === null || isNaN(tempF)) return '#999999'; // gray no data
+      if (tempF === '--' || tempF === null || isNaN(tempF)) return '#999';
       for (let i = 0; i < bounds.length - 1; i++) {
         if (tempF >= bounds[i] && tempF < bounds[i + 1]) return colors[i];
       }
       return colors[colors.length - 1];
     }
 
-    let stationTemps = [];
+    function nearestHourlyTemp(lat, lon, hour) {
+      let minDist = Infinity;
+      let temp = null;
+      for (const loc of locations) {
+        const dist = (loc.lat - lat) ** 2 + (loc.lon - lon) ** 2;
+        if (dist < minDist && forecastData[loc.name] && forecastData[loc.name][hour]) {
+          temp = forecastData[loc.name][hour].temperature;
+          minDist = dist;
+        }
+      }
+      return temp;
+    }
 
-    async function fetchTemps() {
-      stationTemps = [];
-      const promises = locations.map(async (loc) => {
+    async function loadForecasts() {
+      const fetches = locations.map(async (loc) => {
         try {
           const pointRes = await fetch(`https://api.weather.gov/points/${loc.lat},${loc.lon}`);
           const pointData = await pointRes.json();
-          const stationsUrl = pointData.properties.observationStations;
-
-          const stationsRes = await fetch(stationsUrl);
-          const stationsData = await stationsRes.json();
-          const stationId = stationsData.features[0].properties.stationIdentifier;
-
-          const obsRes = await fetch(`https://api.weather.gov/stations/${stationId}/observations/latest`);
-          const obsData = await obsRes.json();
-          const tempC = obsData.properties.temperature.value;
-          const tempF = tempC !== null ? Math.round(tempC * 9/5 + 32) : null;
-
-          stationTemps.push({ lat: loc.lat, lon: loc.lon, tempF: tempF });
+          const hourlyUrl = pointData.properties.forecastHourly;
+          const hourlyRes = await fetch(hourlyUrl);
+          const hourlyData = await hourlyRes.json();
+          forecastData[loc.name] = hourlyData.properties.periods;
         } catch (err) {
-          console.error(`Error loading ${loc.name}:`, err);
-          stationTemps.push({ lat: loc.lat, lon: loc.lon, tempF: null });
+          console.error(`Failed to load forecast for ${loc.name}`, err);
         }
       });
-      await Promise.all(promises);
+
+      await Promise.all(fetches);
+      drawGrid();
     }
-
-    function nearestTemp(lat, lon) {
-      if (stationTemps.length === 0) return null;
-
-      let minDist = Infinity;
-      let nearest = null;
-      stationTemps.forEach(s => {
-        if (s.tempF === null) return;
-        const dist = (s.lat - lat) ** 2 + (s.lon - lon) ** 2;
-        if (dist < minDist) {
-          minDist = dist;
-          nearest = s.tempF;
-        }
-      });
-      return nearest;
-    }
-
-    let gridLayers = [];
-    let labelLayers = [];
-
-    // Track if labels are visible
-    let labelsVisible = true;
 
     function drawGrid() {
-      // Remove existing layers
-      gridLayers.forEach(l => map.removeLayer(l));
-      labelLayers.forEach(l => map.removeLayer(l));
-      gridLayers = [];
-      labelLayers = [];
+      gridLayerGroup.clearLayers();
+      labelLayerGroup.clearLayers();
 
-      // USA approximate bounding box
-      const latStart = 24;
-      const latEnd = 50;
-      const lonStart = -125;
-      const lonEnd = -66;
-      const latStep = 0.25;
-      const lonStep = 0.25;
+      const latStart = 24, latEnd = 50, lonStart = -125, lonEnd = -66;
+      const latStep = 1.0, lonStep = 1.0;
 
-      // Draw colored grid
       for (let lat = latStart; lat < latEnd; lat += latStep) {
         for (let lon = lonStart; lon < lonEnd; lon += lonStep) {
-          const tempF = nearestTemp(lat + latStep/2, lon + lonStep/2);
+          const tempF = nearestHourlyTemp(lat + 0.5, lon + 0.5, currentHour);
           const color = tempToColor(tempF);
-
           const rect = L.rectangle([[lat, lon], [lat + latStep, lon + lonStep]], {
             color: color,
             weight: 0,
             fillColor: color,
             fillOpacity: 0.6,
             interactive: false,
-          }).addTo(map);
-
-          gridLayers.push(rect);
+          });
+          rect.addTo(gridLayerGroup);
         }
       }
 
-      if (labelsVisible) {
-        // Labels spaced by 1 degree
-        const labelStep = 1.0;
-        for (let lat = latStart; lat <= latEnd; lat += labelStep) {
-          for (let lon = lonStart; lon <= lonEnd; lon += labelStep) {
-            const tempF = nearestTemp(lat, lon);
-            const displayTemp = (tempF === null || isNaN(tempF)) ? '--' : tempF.toString();
+      if (labelsVisible && map.getZoom() >= LABEL_ZOOM_THRESHOLD) {
+        const mapBounds = map.getBounds();
+        for (let lat = latStart; lat <= latEnd; lat += 1.0) {
+          for (let lon = lonStart; lon <= lonEnd; lon += 1.0) {
+            const point = L.latLng(lat, lon);
+            if (!mapBounds.contains(point)) continue;
 
+            const tempF = nearestHourlyTemp(lat, lon, currentHour);
+            const displayTemp = (tempF === null || isNaN(tempF)) ? '--' : tempF.toString();
             const label = L.tooltip({
               permanent: true,
               direction: 'center',
               className: 'my-label'
-            })
-            .setLatLng([lat, lon])
-            .setContent(displayTemp + '°F')
-            .addTo(map);
-
-            labelLayers.push(label);
+            }).setLatLng(point).setContent(displayTemp + '°F');
+            labelLayerGroup.addLayer(label);
           }
         }
       }
     }
 
-    // Create custom control for toggling labels
     const ToggleLabelsControl = L.Control.extend({
-      options: {
-        position: 'topright'
-      },
-
-      onAdd: function (map) {
+      options: { position: 'topright' },
+      onAdd: function () {
         const container = L.DomUtil.create('div', 'toggle-labels-control');
         container.innerHTML = 'Toggle Temp Labels';
-
         container.onclick = function () {
           labelsVisible = !labelsVisible;
-          drawGrid();
+          drawGridThrottled();
         };
-
-        // Prevent clicks from propagating to the map
-        L.DomEvent.disableClickPropagation(container);
         return container;
       }
     });
 
-    // Add the toggle control to the map
     map.addControl(new ToggleLabelsControl());
 
-    async function updateMap() {
-      await fetchTemps();
-      drawGrid();
+    let redrawTimeout = null;
+    function drawGridThrottled() {
+      clearTimeout(redrawTimeout);
+      redrawTimeout = setTimeout(drawGrid, 100);
     }
 
-    updateMap();
-    setInterval(updateMap, 10 * 60 * 1000);
+    map.on("zoomend", () => {
+      zoomDisplay.textContent = `Zoom: ${map.getZoom()}`;
+      drawGridThrottled();
+    });
+    map.on("moveend", drawGridThrottled);
 
+    loadForecasts();
+    setInterval(loadForecasts, 30 * 60 * 1000); // refresh every 30 min
   </script>
 </body>
 </html>
