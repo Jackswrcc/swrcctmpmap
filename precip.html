@@ -1,73 +1,73 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>SWRCC Hourly Forecast Symbols Map</title>
+  <title>SWRCC Forecast Grid Map</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <style>
-    body, html {
-      margin: 0;
-      padding: 0;
+    html, body {
       height: 100%;
+      margin: 0;
       font-family: Arial, sans-serif;
       display: flex;
       flex-direction: column;
     }
-
     header {
       background-color: #6a0dad;
       color: white;
       padding: 12px 24px;
       font-size: 20px;
       font-weight: bold;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      flex-shrink: 0;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .nav-button {
+      background-color: white;
+      color: #6a0dad;
+      border: none;
+      padding: 6px 12px;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .nav-button:hover {
+      background-color: #eee;
+    }
     #map { flex-grow: 1; }
-
     #slider-container {
       padding: 10px 20px;
       text-align: center;
     }
-
     #hourSlider {
       width: 100%;
       max-width: 600px;
     }
-
     #hourLabel {
       font-weight: bold;
       margin-left: 10px;
     }
-
     #timeLabel {
       margin-left: 15px;
       font-weight: bold;
-    }
-
-    .leaflet-tooltip.condition-label {
-      background: transparent !important;
-      border: none !important;
-      box-shadow: none !important;
-      color: black !important;
-      font-size: 18px !important;
-      font-weight: normal !important;
-      padding: 0 !important;
-      pointer-events: none;
-      text-align: center;
     }
   </style>
 </head>
 <body>
   <header>
-    SWRCC Hourly Forecast Symbols
-    <span id="zoomLevelDisplay">Zoom: 6</span>
+    <div class="header-left">
+      SWRCC Forecast Grid Map
+      <button class="nav-button" onclick="window.location.href='index.html'">Temp</button>
+    </div>
+    <span id="zoomLevelDisplay">Zoom: 4</span>
   </header>
 
   <div id="slider-container">
@@ -80,16 +80,17 @@
   <div id="map"></div>
 
   <script>
-    const zoomDisplay = document.getElementById("zoomLevelDisplay");
-    const map = L.map('map', { keyboard: false }).setView([42.5, -75], 6);
+    const map = L.map('map', { keyboard: false }).setView([39.5, -98.35], 4);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
+    const zoomDisplay = document.getElementById("zoomLevelDisplay");
     const slider = document.getElementById("hourSlider");
     const hourLabel = document.getElementById("hourLabel");
     const timeLabel = document.getElementById("timeLabel");
 
     const locations = [
-    {name: "Raquette Lake, NY", "lat": 43.8145, "lon": -74.6399},
+    
+  {name: "Raquette Lake, NY", "lat": 43.8145, "lon": -74.6399},
   { name: 'Albany, NY', lat: 42.6526, lon: -73.7562 },
   { name: 'Buffalo, NY', lat: 42.8864, lon: -78.8784 },
   { name: 'New York City, NY', lat: 40.7128, lon: -74.0060 },
@@ -805,11 +806,13 @@
 { name: 'Boothbay, ME', lat: 43.8596, lon: -69.6264 },           // Coastal town
 { name: 'Alfred, ME', lat: 43.4780, lon: -70.7162 },             // Southern interior
 { name: 'Lovell, ME', lat: 44.1840, lon: -70.8884 }              // Western foothills near NH border
-    ];
+
+];
 
     const forecastData = {};
+    const gridLayer = L.layerGroup().addTo(map);
+    const usaBoxLayer = L.layerGroup().addTo(map);
     let currentHour = 0;
-    const labelLayer = L.layerGroup().addTo(map);
 
     function formatHourLabel(offset) {
       const now = new Date();
@@ -821,63 +824,51 @@
       currentHour = parseInt(slider.value);
       hourLabel.textContent = currentHour === 0 ? "Now" : `${currentHour}h`;
       timeLabel.textContent = formatHourLabel(currentHour);
-      drawConditions();
+      drawGrid();
     });
 
     document.addEventListener("keydown", function (e) {
-      if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
-        e.preventDefault();
-        if (e.key === "ArrowLeft" && slider.value > 0) {
-          slider.value = parseInt(slider.value) - 1;
-        }
-        if (e.key === "ArrowRight" && slider.value < 23) {
-          slider.value = parseInt(slider.value) + 1;
-        }
+      if (e.key === "ArrowLeft" && slider.value > 0) {
+        slider.value = parseInt(slider.value) - 1;
+        slider.dispatchEvent(new Event('input'));
+      } else if (e.key === "ArrowRight" && slider.value < 23) {
+        slider.value = parseInt(slider.value) + 1;
         slider.dispatchEvent(new Event('input'));
       }
     });
 
-    function conditionToIcon(condition) {
-  const lower = condition.toLowerCase();
-  if (lower.includes("patchy drizzle") || lower.includes("drizzle")) return "🌧️";
-  if (lower.includes("patchy fog") || lower.includes("fog")) return "🌁";
-  if (lower.includes("sunny") && !lower.includes("partly")) return "☀️";
-  if (lower.includes("mostly sunny")) return "🌤️";
-  if (lower.includes("partly sunny")) return "🌥️";
-  if (lower.includes("partly cloudy")) return "⛅";
-  if (lower.includes("mostly cloudy") || lower.includes("cloudy")) return "☁️";
-  if (lower.includes("slight") || lower.includes("scattered") || lower.includes("isolated")) return "🌦️";
-  if (lower.includes("showers") || lower.includes("thunderstorms")) return "⛈️";
-  if (lower.includes("clear")) return "🌙";
-  if (lower.includes("haze")) return "🌫️";
-  if (lower.includes("smoke")) return "💨";
-  return "❓";
-}
+    function getConditionColor(text) {
+      const lower = text.toLowerCase();
 
+      if (lower.includes("thunderstorms")) return "#064d00"; // very dark green
+      if (lower.includes("showers") || lower.includes("chance of rain")) return "#1faa00"; // darker green
+      if (lower.includes("scattered")) return "#5ee06a"; // medium bright green
+      if (lower.includes("slight") || lower.includes("isolated") || lower.includes("drizzle")) return "#a8f0a2"; // light green
 
+      if (lower.includes("cloudy") || lower.includes("overcast")) return "#888888"; // gray
+      if (lower.includes("clear") || lower.includes("sunny") || lower.includes("partly cloudy") || lower.includes("mostly sunny")) return "#ffff66"; // yellow
 
-    function drawConditions() {
-      labelLayer.clearLayers();
-      for (const loc of locations) {
-        const forecast = forecastData[loc.name];
-        if (!forecast || !forecast[currentHour]) continue;
-
-        const shortForecast = forecast[currentHour].shortForecast || "N/A";
-        const icon = conditionToIcon(shortForecast);
-
-        const label = L.tooltip({
-          permanent: true,
-          direction: 'center',
-          className: 'condition-label'
-        })
-        .setLatLng([loc.lat, loc.lon])
-        .setContent(icon);
-
-        labelLayer.addLayer(label);
-      }
+      return null;
     }
 
-    async function loadForecasts() {
+    function conditionToIcon(condition) {
+      const lower = condition.toLowerCase();
+      if (lower.includes("patchy drizzle") || lower.includes("drizzle")) return "🌧️";
+      if (lower.includes("patchy fog") || lower.includes("fog")) return "🌁";
+      if (lower.includes("sunny") && !lower.includes("partly")) return "☀️";
+      if (lower.includes("mostly sunny")) return "🌤️";
+      if (lower.includes("partly sunny")) return "🌥️";
+      if (lower.includes("partly cloudy")) return "⛅";
+      if (lower.includes("mostly cloudy") || lower.includes("cloudy")) return "☁️";
+      if (lower.includes("slight") || lower.includes("scattered") || lower.includes("isolated")) return "🌦️";
+      if (lower.includes("showers") || lower.includes("thunderstorms")) return "⛈️";
+      if (lower.includes("clear")) return "🌙";
+      if (lower.includes("haze")) return "🌫️";
+      if (lower.includes("smoke")) return "💨";
+      return "❓";
+    }
+
+    async function fetchForecasts() {
       const fetches = locations.map(async (loc) => {
         try {
           const pointRes = await fetch(`https://api.weather.gov/points/${loc.lat},${loc.lon}`);
@@ -887,20 +878,58 @@
           const hourlyData = await hourlyRes.json();
           forecastData[loc.name] = hourlyData.properties.periods;
         } catch (err) {
-          console.error(`Failed to load forecast for ${loc.name}`, err);
+          console.error(`Error loading forecast for ${loc.name}`, err);
         }
       });
 
       await Promise.all(fetches);
-      drawConditions();
+      drawUSABox();
+      drawGrid();
+    }
+
+    function drawUSABox() {
+      usaBoxLayer.clearLayers();
+      const usaBox = L.rectangle([
+        [24.5, -125],
+        [49.5, -66]
+      ], {
+        color: "#000",
+        weight: 2,
+        fill: false
+      });
+      usaBoxLayer.addLayer(usaBox);
+    }
+
+    function drawGrid() {
+      gridLayer.clearLayers();
+      const boxSize = 0.2;
+
+      for (const loc of locations) {
+        const periods = forecastData[loc.name];
+        if (!periods || !periods[currentHour]) continue;
+
+        const condition = periods[currentHour].shortForecast || "";
+        const color = getConditionColor(condition);
+        if (!color) continue;
+
+        const rect = L.rectangle([
+          [loc.lat - boxSize / 2, loc.lon - boxSize / 2],
+          [loc.lat + boxSize / 2, loc.lon + boxSize / 2]
+        ], {
+          color: color,
+          weight: 1,
+          fillOpacity: 0.6
+        });
+        gridLayer.addLayer(rect);
+      }
     }
 
     map.on("zoomend", () => {
       zoomDisplay.textContent = `Zoom: ${map.getZoom()}`;
     });
 
-    loadForecasts();
-    setInterval(loadForecasts, 30 * 60 * 1000);
+    fetchForecasts();
+    setInterval(fetchForecasts, 30 * 60 * 1000); // refresh every 30 min
   </script>
 </body>
 </html>
