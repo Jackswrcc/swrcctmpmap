@@ -63,13 +63,16 @@
 </head>
 <body>
   <header>
-    <div class="header-left">
-      SWRCC Forecast Grid Map
-      <button class="nav-button" onclick="window.location.href='index.html'">Temp</button>
-    </div>
-    <button onclick="location.href='wind.html'" style="padding: 6px 12px; font-size: 14px; cursor: pointer;">
-      Wind
-    </button>
+    <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+      <div style="font-weight: bold; font-size: 20px; color: white; white-space: nowrap;">
+        SWRCC Wind Forecast Map
+      </div>
+      <button onclick="location.href='wind.html'" style="padding: 6px 12px; font-size: 14px; cursor: pointer;">
+        Wind
+      </button>
+      <button onclick="location.href='index.html'" style="padding: 6px 12px; font-size: 14px; cursor: pointer;">
+        Temp
+      </button>
     <span id="zoomLevelDisplay">Zoom: 4</span>
   </header>
 
