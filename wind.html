@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SWRCC Wind Forecast Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background-color: #6a0dad;
+      color: white;
+      padding: 12px 24px;
+      font-size: 20px;
+      font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header > div {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    #zoomLevelDisplay {
+      font-size: 14px;
+      font-weight: normal;
+    }
+
+    button {
+      background: white;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      color: #6a0dad;
+      font-weight: bold;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #ddd;
+    }
+
+    #map {
+      flex-grow: 1;
+    }
+
+    #slider-container {
+      padding: 10px 20px;
+      text-align: center;
+      background: #f0f0f0;
+    }
+
+    #hourSlider {
+      width: 100%;
+      max-width: 600px;
+    }
+
+    #mphKey {
+      display: flex;
+      justify-content: center;
+      padding: 8px 0;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .legend-color {
+      width: 18px;
+      height: 12px;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+
+    <header>
+        <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+          <div style="font-weight: bold; font-size: 20px; color: white; white-space: nowrap;">
+            SWRCC Wind Forecast Map
+          </div>
+          <button onclick="location.href='index.html'" style="padding: 6px 12px; font-size: 14px; cursor: pointer;">
+            Temp
+          </button>
+          <button onclick="location.href='precip.html'" style="padding: 6px 12px; font-size: 14px; cursor: pointer;">
+            Conditions/Precip
+          </button>
+          <div style="margin-left: auto; font-size: 14px; font-weight: normal;" id="zoomLevelDisplay">
+            Zoom: 7
+          </div>
+        </div>
+      </header>
+      
+
+  <div id="slider-container">
+    Hour Ahead:
+    <input type="range" id="hourSlider" min="0" max="23" value="0" />
+    <span id="hourLabel">Now</span>
+    <span id="timeLabel"></span>
+
+    <div id="mphKey">
+      <div class="legend-item"><div class="legend-color" style="background:#4575b4"></div>0–5 mph</div>
+      <div class="legend-item"><div class="legend-color" style="background:#91bfdb"></div>5–10 mph</div>
+      <div class="legend-item"><div class="legend-color" style="background:#e0f3f8"></div>10–15 mph</div>
+      <div class="legend-item"><div class="legend-color" style="background:#fee090"></div>15–20 mph</div>
+      <div class="legend-item"><div class="legend-color" style="background:#fc8d59"></div>20–25 mph</div>
+      <div class="legend-item"><div class="legend-color" style="background:#d73027"></div>25–30+ mph</div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <script>
+    const zoomDisplay = document.getElementById("zoomLevelDisplay");
+    const slider = document.getElementById("hourSlider");
+    const hourLabel = document.getElementById("hourLabel");
+    const timeLabel = document.getElementById("timeLabel");
+
+    const map = L.map('map', { keyboard: false }).setView([42.5, -75], 7);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    const locations = [
+      { name: "Raquette Lake, NY", lat: 43.8145, lon: -74.6399 },
+      { name: 'Albany, NY', lat: 42.6526, lon: -73.7562 },
+      { name: 'Buffalo, NY', lat: 42.8864, lon: -78.8784 },
+      { name: 'New York City, NY', lat: 40.7128, lon: -74.0060 },
+      { name: 'Rochester, NY', lat: 43.1566, lon: -77.6088 },
+      { name: 'Syracuse, NY', lat: 43.0481, lon: -76.1474 },
+      { name: 'Yonkers, NY', lat: 40.9312, lon: -73.8988 }
+    ];
+
+    const forecastData = {};
+    let vectorLayers = [];
+    let currentHour = 0;
+
+    slider.addEventListener("input", () => {
+      currentHour = parseInt(slider.value);
+      hourLabel.textContent = currentHour === 0 ? "Now" : `${currentHour}h`;
+      timeLabel.textContent = formatHourOnly(currentHour);
+      resetAllAnimations();
+      drawWindVectors();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") {
+        slider.value = Math.min(23, parseInt(slider.value) + 1);
+        slider.dispatchEvent(new Event('input'));
+        e.preventDefault();
+      }
+      if (e.key === "ArrowLeft") {
+        slider.value = Math.max(0, parseInt(slider.value) - 1);
+        slider.dispatchEvent(new Event('input'));
+        e.preventDefault();
+      }
+    });
+
+    function formatHourOnly(hourOffset) {
+      const now = new Date();
+      now.setHours(now.getHours() + hourOffset);
+      return now.toLocaleTimeString([], { hour: 'numeric', hour12: true });
+    }
+
+    async function loadForecasts() {
+      const fetches = locations.map(async (loc) => {
+        try {
+          const pointRes = await fetch(`https://api.weather.gov/points/${loc.lat},${loc.lon}`);
+          const pointData = await pointRes.json();
+          const hourlyUrl = pointData.properties.forecastHourly;
+          const hourlyRes = await fetch(hourlyUrl);
+          const hourlyData = await hourlyRes.json();
+          forecastData[loc.name] = hourlyData.properties.periods;
+        } catch (err) {
+          console.error(`Failed to load forecast for ${loc.name}`, err);
+        }
+      });
+
+      await Promise.all(fetches);
+      drawWindVectors();
+    }
+
+    function resetAllAnimations() {
+      for (const layer of vectorLayers) {
+        map.removeLayer(layer.group);
+        cancelAnimationFrame(layer.animId);
+      }
+      vectorLayers = [];
+    }
+
+    function drawWindVectors() {
+      for (const loc of locations) {
+        const forecast = forecastData[loc.name];
+        if (!forecast || !forecast[currentHour]) continue;
+
+        const period = forecast[currentHour];
+        const dirText = period.windDirection;
+        const speedText = period.windSpeed;
+
+        if (!dirText || !speedText) continue;
+
+        const dirDeg = directionToDegrees(dirText);
+        const speedMPH = parseFloat(speedText) || 5;
+
+        animateWindLine(loc.lat, loc.lon, dirDeg, speedMPH);
+      }
+    }
+
+    function directionToDegrees(dir) {
+      const lookup = {
+        N: 0, NNE: 22.5, NE: 45, ENE: 67.5,
+        E: 90, ESE: 112.5, SE: 135, SSE: 157.5,
+        S: 180, SSW: 202.5, SW: 225, WSW: 247.5,
+        W: 270, WNW: 292.5, NW: 315, NNW: 337.5
+      };
+      return lookup[dir.trim().toUpperCase()] || 0;
+    }
+
+    function getColorBySpeed(speed) {
+      if (speed < 5) return "#4575b4";
+      if (speed < 10) return "#91bfdb";
+      if (speed < 15) return "#e0f3f8";
+      if (speed < 20) return "#fee090";
+      if (speed < 25) return "#fc8d59";
+      return "#d73027";
+    }
+
+    function animateWindLine(lat, lon, degrees, speedMPH) {
+      const group = L.layerGroup().addTo(map);
+      const length = 0.22;
+      const step = 0.003 * (speedMPH / 10);
+      let offset = 0;
+
+      const trailLength = 12;
+      const trailLayers = [];
+
+      const color = getColorBySpeed(speedMPH);
+
+      function draw() {
+        const angle = degrees * (Math.PI / 180);
+        const dirX = Math.cos(angle);
+        const dirY = Math.sin(angle);
+
+        const baseLat = lat - dirY * 0.5;
+        const baseLon = lon - dirX * 0.5;
+
+        const offsetX = dirX * offset;
+        const offsetY = dirY * offset;
+
+        const startLat = baseLat + offsetY;
+        const startLon = baseLon + offsetX;
+        const endLat = startLat + dirY * length;
+        const endLon = startLon + dirX * length;
+
+        const segment = L.polyline([[startLat, startLon], [endLat, endLon]], {
+          color,
+          weight: 2,
+          opacity: 0.9
+        }).addTo(group);
+
+        trailLayers.unshift(segment);
+        trailLayers.forEach((layer, i) => {
+          const opacity = 0.1 + 0.8 * (1 - i / trailLength);
+          layer.setStyle({ opacity });
+        });
+
+        if (trailLayers.length > trailLength) {
+          const old = trailLayers.pop();
+          group.removeLayer(old);
+        }
+
+        offset += step;
+        if (offset > 0.5) offset = 0;
+
+        const animId = requestAnimationFrame(draw);
+        layer.animId = animId;
+      }
+
+      const layer = { group };
+      vectorLayers.push(layer);
+      draw();
+    }
+
+    map.on("zoomend", () => {
+      zoomDisplay.textContent = `Zoom: ${map.getZoom()}`;
+    });
+
+    loadForecasts();
+    setInterval(loadForecasts, 30 * 60 * 1000);
+  </script>
+</body>
+</html>
