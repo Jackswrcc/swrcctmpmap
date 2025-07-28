@@ -133,13 +133,21 @@
 </head>
 <body>
   <header>
-    <div class="nav-buttons">
-      <span>SWRCC Hourly Temperature Map</span>
-      <button class="nav-button" onclick="window.location.href='precip.html'">Conditions/precip</button>
+    <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+      <div style="font-weight: bold; font-size: 20px; color: white; white-space: nowrap;">
+        SWRCC Wind Forecast Map
+      </div>
+      <button onclick="location.href='wind.html'" style="padding: 6px 12px; font-size: 14px; cursor: pointer;">
+        Wind
+      </button>
+      <button onclick="location.href='precip.html'" style="padding: 6px 12px; font-size: 14px; cursor: pointer;">
+        Conditions/Precip
+      </button>
+      <div style="margin-left: auto; font-size: 14px; font-weight: normal;" id="zoomLevelDisplay">
+        Zoom: 7
+      </div>
     </div>
-    <button onclick="location.href='wind.html'" style="padding: 6px 12px; font-size: 14px; cursor: pointer;">
-      Wind
-    </button>
+  </header>
     <span id="zoomLevelDisplay">Zoom: 4</span>
   </header>
 
