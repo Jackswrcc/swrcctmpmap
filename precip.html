@@ -59,6 +59,26 @@
       margin-left: 15px;
       font-weight: bold;
     }
+    #conditionPanel {
+      background-color: #f4f4f4;
+      border-top: 1px solid #ccc;
+      padding: 10px;
+      font-size: 14px;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+    }
+    .condition-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .condition-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: inline-block;
+    }
   </style>
 </head>
 <body>
@@ -84,6 +104,33 @@
   </div>
 
   <div id="map"></div>
+
+  <div id="conditionPanel">
+    <div class="condition-item">
+      <span class="condition-color" style="background-color: #064d00;"></span>
+      Thunderstorms
+    </div>
+    <div class="condition-item">
+      <span class="condition-color" style="background-color: #1faa00;"></span>
+      Showers/Chance of Rain
+    </div>
+    <div class="condition-item">
+      <span class="condition-color" style="background-color: #5ee06a;"></span>
+      Scattered
+    </div>
+    <div class="condition-item">
+      <span class="condition-color" style="background-color: #a8f0a2;"></span>
+      Slight/Isolated/Drizzle
+    </div>
+    <div class="condition-item">
+      <span class="condition-color" style="background-color: #888888;"></span>
+      Cloudy/Overcast
+    </div>
+    <div class="condition-item">
+      <span class="condition-color" style="background-color: #ffff66;"></span>
+      Clear/Sunny
+    </div>
+  </div>
 
   <script>
     const map = L.map('map', { keyboard: false }).setView([39.5, -98.35], 4);
